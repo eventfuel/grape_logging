@@ -1,19 +1,36 @@
 module GrapeLogging
   module Formatters
     class Logstash
-      def call(_severity, _datetime, _, data)
+      def call(severity, datetime, _, data)
         load_dependencies
-        event = LogStash::Event.new(data)
 
-        event["message"] =
-          "[#{data[:status]}] #{data[:method]} #{data[:path]} (#{data[:controller]}##{data[:action]})"
-        event.to_json
+        if data.is_a?(String)
+          data = {
+            severity: severity,
+            datetime: datetime,
+            location: 'api',
+            message: data
+          }
+        elsif data.is_a?(Exception)
+          format_exception(data)
+        elsif !data.is_a?(Hash)
+          data = data.inspect
+        end
+        response = LogStash::Event.new(data).to_json
+        response
+      end
+
+      def format_exception(exception)
+        {
+          exception_message: exception.message,
+          exception_backtrace: exception.backtrace
+        }
       end
 
       def load_dependencies
-        require "logstash-event"
+        require 'logstash-event'
       rescue LoadError
-        puts "You need to install the logstash-event gem to use the logstash output."
+        puts 'You need the logstash-event gem installed to use logstash output.'
         raise
       end
     end
